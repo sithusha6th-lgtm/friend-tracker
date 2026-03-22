@@ -1,0 +1,990 @@
+--[[
+  👥 VOID FRIENDS  v1
+  by @voiditic_456  •  discord.gg/9XTXAseJ5r
+
+  FEATURES:
+  ▸ Full friend list with online status, current game, presence
+  ▸ Presence pills: In Game / Online / Offline / Studio
+  ▸ One-click join any friend's game
+  ▸ Copy profile URL per friend
+  ▸ Sort: online first · alphabetical · recently active
+  ▸ Filter: online only · in-game only · search by name
+  ▸ Follow mode — auto-joins a friend when they change servers
+  ▸ Auto-refresh every 30s with live countdown
+  ▸ Manual refresh button
+  ▸ Stats bar: total friends · online · in-game
+  ▸ Session log — tracks who came online/offline this session
+  ▸ Toast notification when a friend comes online
+  ▸ Startup splash card (Executors + Functions subpages)
+  ▸ Mobile + PC support with auto scaling
+  ▸ RightShift toggles window
+]]
+
+-- ══════════════════════════════════════════════════════
+local Players         = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local TweenService    = game:GetService("TweenService")
+local UIS             = game:GetService("UserInputService")
+local RunService      = game:GetService("RunService")
+local HttpService     = game:GetService("HttpService")
+local lp              = Players.LocalPlayer
+
+-- ══════════════════════════════════════════════════════
+--  MOBILE + SCALE
+-- ══════════════════════════════════════════════════════
+local IS_MOBILE = UIS.TouchEnabled and not UIS.KeyboardEnabled
+local M = IS_MOBILE and 1.25 or 1.0
+local function px(n) return math.round(n * M) end
+
+-- ══════════════════════════════════════════════════════
+--  COLOURS
+-- ══════════════════════════════════════════════════════
+local C = {
+    bg0    = Color3.fromRGB(  8,   8,  18),
+    bg1    = Color3.fromRGB( 13,  13,  28),
+    bg2    = Color3.fromRGB( 22,  22,  45),
+    bg3    = Color3.fromRGB( 32,  32,  62),
+    border = Color3.fromRGB( 60,  50, 110),
+    acc    = Color3.fromRGB(139,  92, 246),
+    accL   = Color3.fromRGB(167, 130, 255),
+    cyan   = Color3.fromRGB( 34, 211, 238),
+    green  = Color3.fromRGB( 52, 211, 153),
+    red    = Color3.fromRGB(239,  68,  68),
+    yellow = Color3.fromRGB(251, 191,  36),
+    orange = Color3.fromRGB(251, 140,  36),
+    text   = Color3.fromRGB(226, 232, 240),
+    mid    = Color3.fromRGB(148, 163, 184),
+    dim    = Color3.fromRGB( 71,  85, 105),
+    white  = Color3.fromRGB(255, 255, 255),
+}
+
+-- ══════════════════════════════════════════════════════
+--  GUI HELPERS
+-- ══════════════════════════════════════════════════════
+local function tw(i, p, t, s, d)
+    TweenService:Create(i,
+        TweenInfo.new(t or 0.18, s or Enum.EasingStyle.Quad, d or Enum.EasingDirection.Out),
+        p):Play()
+end
+local function cr(i, r)
+    local u = Instance.new("UICorner"); u.CornerRadius = UDim.new(0, r or 8)
+    u.Parent = i; return u
+end
+local function st(i, col, thick)
+    local u = Instance.new("UIStroke"); u.Color = col or C.border
+    u.Thickness = thick or 1; u.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    u.Parent = i; return u
+end
+local function mkF(p, sz, pos, bg, tr)
+    local f = Instance.new("Frame")
+    f.Size = sz or UDim2.new(1,0,1,0); f.Position = pos or UDim2.new(0,0,0,0)
+    f.BackgroundColor3 = bg or C.bg1; f.BackgroundTransparency = tr or 0
+    f.BorderSizePixel = 0; f.Parent = p; return f
+end
+local function mkT(p, txt, sz, col, font, xa)
+    local l = Instance.new("TextLabel")
+    l.Text = txt or ""; l.TextSize = sz or 13
+    l.TextColor3 = col or C.text; l.Font = font or Enum.Font.Gotham
+    l.BackgroundTransparency = 1; l.BorderSizePixel = 0
+    l.TextXAlignment = xa or Enum.TextXAlignment.Left
+    l.TextYAlignment = Enum.TextYAlignment.Center
+    l.Size = UDim2.new(1,0,1,0); l.Parent = p; return l
+end
+local function mkB(p, txt, sz, col, bg)
+    local b = Instance.new("TextButton")
+    b.Text = txt or ""; b.TextSize = sz or 13
+    b.TextColor3 = col or C.text; b.Font = Enum.Font.GothamBold
+    b.BackgroundColor3 = bg or C.bg3; b.BorderSizePixel = 0
+    b.AutoButtonColor = false; b.Size = UDim2.new(1,0,1,0)
+    b.Parent = p; return b
+end
+local function hov(b, n, h)
+    if IS_MOBILE then
+        b.MouseButton1Click:Connect(function()
+            tw(b,{BackgroundColor3=h},0.05)
+            task.delay(0.15,function() tw(b,{BackgroundColor3=n},0.12) end)
+        end)
+    else
+        b.MouseEnter:Connect(function() tw(b,{BackgroundColor3=h},0.1) end)
+        b.MouseLeave:Connect(function() tw(b,{BackgroundColor3=n},0.1) end)
+    end
+end
+local function animGrad(f, cols)
+    local g = Instance.new("UIGradient")
+    local kp = {}
+    for i,c in ipairs(cols) do
+        table.insert(kp, ColorSequenceKeypoint.new((i-1)/(#cols-1), c))
+    end
+    g.Color = ColorSequence.new(kp); g.Parent = f
+    task.spawn(function()
+        local t = 0
+        while f and f.Parent do
+            t += RunService.Heartbeat:Wait()
+            g.Rotation = (t * 30) % 360
+        end
+    end)
+end
+local function makeDrag(handle, win)
+    local drag, si, sp = false, nil, nil
+    local function began(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1
+        or i.UserInputType==Enum.UserInputType.Touch then
+            drag=true; si=i.Position; sp=win.Position
+        end
+    end
+    local function changed(i)
+        if not drag then return end
+        if i.UserInputType==Enum.UserInputType.MouseMovement
+        or i.UserInputType==Enum.UserInputType.Touch then
+            if si and sp then
+                local d=i.Position-si
+                win.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
+            end
+        end
+    end
+    local function ended(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1
+        or i.UserInputType==Enum.UserInputType.Touch then drag=false end
+    end
+    handle.InputBegan:Connect(began); handle.InputChanged:Connect(changed)
+    handle.InputEnded:Connect(ended); UIS.InputChanged:Connect(changed)
+    UIS.InputEnded:Connect(ended)
+end
+
+-- ══════════════════════════════════════════════════════
+--  GUI ROOT
+-- ══════════════════════════════════════════════════════
+local pg = lp:WaitForChild("PlayerGui")
+do local old=pg:FindFirstChild("VoidFriends") if old then old:Destroy() end end
+
+local Root = Instance.new("ScreenGui")
+Root.Name="VoidFriends"; Root.ResetOnSpawn=false
+Root.DisplayOrder=999999; Root.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+Root.IgnoreGuiInset=false; Root.Parent=pg
+
+-- ══════════════════════════════════════════════════════
+--  ████  SPLASH CARD
+-- ══════════════════════════════════════════════════════
+local CARD_W = px(IS_MOBILE and 330 or 360)
+local CARD_H = px(IS_MOBILE and 400 or 345)
+
+local Backdrop=mkF(Root,UDim2.new(1,0,1,0),UDim2.new(0,0,0,0),C.bg0)
+Backdrop.ZIndex=30
+for i=1,12 do mkF(Backdrop,UDim2.new(0,1,1,0),UDim2.new(i/13,0,0,0),C.acc,0.92).ZIndex=30 end
+for i=1,7  do mkF(Backdrop,UDim2.new(1,0,0,1),UDim2.new(0,0,i/8,0),C.acc,0.92).ZIndex=30  end
+local Glow=mkF(Backdrop,UDim2.new(0,px(500),0,px(500)),UDim2.new(0.5,-px(250),0.5,-px(250)),C.acc,0.82)
+Glow.ZIndex=30; cr(Glow,px(250))
+
+local Card=mkF(Backdrop,UDim2.new(0,CARD_W,0,CARD_H),UDim2.new(0.5,-CARD_W/2,0.5,-CARD_H/2),C.bg1,1)
+Card.ZIndex=31; Card.ClipsDescendants=true; cr(Card,px(14)); st(Card,C.acc,1)
+
+local TopBar=mkF(Card,UDim2.new(1,0,0,px(3)),UDim2.new(0,0,0,0),C.bg0)
+TopBar.ZIndex=32; cr(TopBar,px(14))
+mkF(TopBar,UDim2.new(1,0,0,px(10)),UDim2.new(0,0,1,-px(10)),C.bg0).ZIndex=32
+animGrad(TopBar,{Color3.fromRGB(139,92,246),Color3.fromRGB(34,211,238),Color3.fromRGB(52,211,153),Color3.fromRGB(139,92,246)})
+
+local PBadgeF=mkF(Card,UDim2.new(0,px(72),0,px(22)),UDim2.new(1,-px(78),0,px(10)),
+    IS_MOBILE and Color3.fromRGB(15,40,28) or Color3.fromRGB(20,15,50))
+PBadgeF.ZIndex=32; cr(PBadgeF,px(5)); st(PBadgeF,IS_MOBILE and C.green or C.acc,1)
+mkT(PBadgeF,IS_MOBILE and "📱 Mobile" or "🖥 PC",px(9),IS_MOBILE and C.green or C.acc,
+    Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=33
+
+local IconF=mkF(Card,UDim2.new(0,px(56),0,px(56)),UDim2.new(0.5,-px(28),0,px(16)),C.bg3)
+IconF.ZIndex=32; cr(IconF,px(14)); st(IconF,C.acc,1)
+mkT(IconF,"👥",px(26),C.acc,Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=33
+
+local TitleL=mkT(Card,"VOID FRIENDS",px(25),C.white,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+TitleL.Size=UDim2.new(1,0,0,px(30)); TitleL.Position=UDim2.new(0,0,0,px(84)); TitleL.ZIndex=32
+
+local SubL=mkT(Card,"Friend Activity Tracker",px(11),C.mid,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+SubL.Size=UDim2.new(1,0,0,px(14)); SubL.Position=UDim2.new(0,0,0,px(117)); SubL.ZIndex=32
+
+local AuthorL=mkT(Card,"by @voiditic_456 on Discord",px(11),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+AuthorL.Size=UDim2.new(1,0,0,px(14)); AuthorL.Position=UDim2.new(0,0,0,px(133)); AuthorL.ZIndex=32
+
+mkF(Card,UDim2.new(0.7,0,0,1),UDim2.new(0.15,0,0,px(153)),C.border).ZIndex=32
+
+local JoinL=mkT(Card,"🎮  Join Discord for more scripts!",px(12),C.acc,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+JoinL.Size=UDim2.new(1,0,0,px(16)); JoinL.Position=UDim2.new(0,0,0,px(160)); JoinL.ZIndex=32
+
+local LinkWrap=mkF(Card,UDim2.new(1,-px(28),0,px(IS_MOBILE and 42 or 32)),UDim2.new(0,px(14),0,px(181)),C.bg0)
+LinkWrap.ZIndex=32; cr(LinkWrap,px(7)); st(LinkWrap,C.border,1)
+local LinkL=mkT(LinkWrap,"discord.gg/9XTXAseJ5r",px(11),C.mid,Enum.Font.Gotham)
+LinkL.Size=UDim2.new(1,-px(84),1,0); LinkL.Position=UDim2.new(0,px(10),0,0); LinkL.ZIndex=33
+local CopyF=mkF(LinkWrap,UDim2.new(0,px(70),0,px(IS_MOBILE and 30 or 22)),
+    UDim2.new(1,-px(74),0.5,-px(IS_MOBILE and 15 or 11)),C.acc)
+CopyF.ZIndex=33; cr(CopyF,px(5))
+local CopyB=mkB(CopyF,"📋 Copy",px(10),C.bg0,C.acc); CopyB.ZIndex=34; hov(CopyB,C.acc,C.accL)
+local _cp=false
+CopyB.MouseButton1Click:Connect(function()
+    if _cp then return end; _cp=true
+    pcall(function() setclipboard("https://discord.gg/9XTXAseJ5r") end)
+    CopyB.Text="✓ Done!"; CopyB.TextColor3=C.green; tw(CopyF,{BackgroundColor3=C.green},0.1)
+    task.delay(2.5,function() _cp=false; CopyB.Text="📋 Copy"; CopyB.TextColor3=C.bg0; tw(CopyF,{BackgroundColor3=C.acc},0.2) end)
+end)
+
+local TILE_Y=px(IS_MOBILE and 233 or 220); local TILE_H=px(IS_MOBILE and 44 or 34)
+local MARGIN=px(14); local TILE_W=math.floor((CARD_W-MARGIN*3)/2)
+
+local ExecTileF=mkF(Card,UDim2.new(0,TILE_W,0,TILE_H),UDim2.new(0,MARGIN,0,TILE_Y),C.bg2)
+ExecTileF.ZIndex=32; cr(ExecTileF,px(8)); st(ExecTileF,C.cyan,1)
+local ExecBtn=mkB(ExecTileF,"💻  Executors",px(11),C.text,C.bg2); ExecBtn.ZIndex=33; hov(ExecBtn,C.bg2,C.bg3)
+
+local FuncTileF=mkF(Card,UDim2.new(0,TILE_W,0,TILE_H),UDim2.new(0,MARGIN*2+TILE_W,0,TILE_Y),C.bg2)
+FuncTileF.ZIndex=32; cr(FuncTileF,px(8)); st(FuncTileF,C.yellow,1)
+local FuncBtn=mkB(FuncTileF,"🔧  Functions",px(11),C.text,C.bg2); FuncBtn.ZIndex=33; hov(FuncBtn,C.bg2,C.bg3)
+
+local CONT_Y=TILE_Y+TILE_H+px(8)
+local ContF=mkF(Card,UDim2.new(1,-px(28),0,px(IS_MOBILE and 48 or 38)),UDim2.new(0,px(14),0,CONT_Y),C.acc)
+ContF.ZIndex=32; cr(ContF,px(9))
+local ContB=mkB(ContF,"▶  Continue",px(14),C.bg0,C.acc); ContB.ZIndex=33; hov(ContB,C.acc,C.accL)
+
+local FOOTER_Y=CONT_Y+px(IS_MOBILE and 48 or 38)+px(8)
+local FootL=mkT(Card,"@voiditic_456  •  discord.gg/9XTXAseJ5r",px(10),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+FootL.Size=UDim2.new(1,0,0,px(12)); FootL.Position=UDim2.new(0,0,0,FOOTER_Y); FootL.ZIndex=32
+
+-- ── Subpage: Executors ─────────────────────────────
+local ExecPage=mkF(Card,UDim2.new(1,0,1,0),UDim2.new(1,0,0,0),C.bg1)
+ExecPage.ZIndex=34; ExecPage.ClipsDescendants=true
+local EPTop=mkF(ExecPage,UDim2.new(1,0,0,px(3)),UDim2.new(0,0,0,0),C.bg0); EPTop.ZIndex=35; cr(EPTop,px(14))
+mkF(EPTop,UDim2.new(1,0,0,px(10)),UDim2.new(0,0,1,-px(10)),C.bg0).ZIndex=35
+animGrad(EPTop,{Color3.fromRGB(34,211,238),Color3.fromRGB(139,92,246),Color3.fromRGB(34,211,238)})
+local EPTit=mkT(ExecPage,"💻  Recommended Executors",px(14),C.white,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+EPTit.Size=UDim2.new(1,0,0,px(22)); EPTit.Position=UDim2.new(0,0,0,px(8)); EPTit.ZIndex=35
+local EXECS={{n="Volt",c=C.yellow},{n="Potassium",c=C.acc},{n="Wave",c=C.cyan},
+             {n="Isaeva",c=C.green},{n="MacSploit",c=C.mid},{n="Opiumware",c=C.red}}
+local ER_H=px(IS_MOBILE and 34 or 26); local ER_GAP=px(IS_MOBILE and 34 or 28)
+for i,ex in ipairs(EXECS) do
+    local r=mkF(ExecPage,UDim2.new(1,-px(24),0,ER_H),UDim2.new(0,px(12),0,px(34)+(i-1)*ER_GAP),C.bg2)
+    r.ZIndex=35; cr(r,px(6)); st(r,ex.c,1)
+    local dot=mkF(r,UDim2.new(0,px(7),0,px(7)),UDim2.new(0,px(9),0.5,-px(3)),ex.c); dot.ZIndex=36; cr(dot,px(4))
+    local nl=mkT(r,ex.n,px(12),C.text,Enum.Font.GothamBold)
+    nl.Size=UDim2.new(1,-px(22),1,0); nl.Position=UDim2.new(0,px(22),0,0); nl.ZIndex=36
+end
+local EP_HY=px(34)+#EXECS*ER_GAP+px(4)
+local EPHintF=mkF(ExecPage,UDim2.new(1,-px(24),0,px(44)),UDim2.new(0,px(12),0,EP_HY),C.bg0)
+EPHintF.ZIndex=35; cr(EPHintF,px(6)); st(EPHintF,C.border,1)
+local epH1=mkT(EPHintF,"Get executors from:",px(11),C.mid,Enum.Font.GothamBold,Enum.TextXAlignment.Center); epH1.ZIndex=36
+local epH2=mkT(EPHintF,"weao.gg  •  wearedevs.net/exploits",px(11),C.cyan,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+epH2.Size=UDim2.new(1,0,0,px(16)); epH2.Position=UDim2.new(0,0,0,px(22)); epH2.ZIndex=36
+local EPBackF=mkF(ExecPage,UDim2.new(1,-px(24),0,px(IS_MOBILE and 40 or 30)),UDim2.new(0,px(12),0,EP_HY+px(50)),C.bg3)
+EPBackF.ZIndex=35; cr(EPBackF,px(7)); st(EPBackF,C.border,1)
+local EPBackB=mkB(EPBackF,"← Back",px(12),C.mid,C.bg3); EPBackB.ZIndex=36; hov(EPBackB,C.bg3,C.bg2)
+
+-- ── Subpage: Functions ─────────────────────────────
+local FuncPage=mkF(Card,UDim2.new(1,0,1,0),UDim2.new(1,0,0,0),C.bg1)
+FuncPage.ZIndex=34; FuncPage.ClipsDescendants=true
+local FPTop=mkF(FuncPage,UDim2.new(1,0,0,px(3)),UDim2.new(0,0,0,0),C.bg0); FPTop.ZIndex=35; cr(FPTop,px(14))
+mkF(FPTop,UDim2.new(1,0,0,px(10)),UDim2.new(0,0,1,-px(10)),C.bg0).ZIndex=35
+animGrad(FPTop,{Color3.fromRGB(251,191,36),Color3.fromRGB(139,92,246),Color3.fromRGB(251,191,36)})
+local FPTit=mkT(FuncPage,"🔧  Needed Functions",px(14),C.white,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+FPTit.Size=UDim2.new(1,0,0,px(22)); FPTit.Position=UDim2.new(0,0,0,px(8)); FPTit.ZIndex=35
+local FUNCS={
+    {n="request / http_request", d="Presence data (optional, shows Online/In-Game)", a=type(request)=="function" or type(http_request)=="function"},
+    {n="setclipboard",           d="Copy profile URLs",                               a=type(setclipboard)=="function"},
+    {n="loadstring",             d="Script execution",                                a=type(loadstring)=="function"},
+}
+local FR_H=px(IS_MOBILE and 48 or 38)
+local FPScroll=Instance.new("ScrollingFrame")
+FPScroll.Size=UDim2.new(1,0,0,px(IS_MOBILE and 230 or 150)); FPScroll.Position=UDim2.new(0,0,0,px(34))
+FPScroll.BackgroundTransparency=1; FPScroll.BorderSizePixel=0
+FPScroll.ScrollBarThickness=IS_MOBILE and px(5) or 3; FPScroll.ScrollBarImageColor3=C.acc
+FPScroll.CanvasSize=UDim2.new(0,0,0,0); FPScroll.ZIndex=35; FPScroll.Parent=FuncPage
+local FPLL=Instance.new("UIListLayout"); FPLL.SortOrder=Enum.SortOrder.LayoutOrder
+FPLL.Padding=UDim.new(0,px(4)); FPLL.Parent=FPScroll
+local FPPad=Instance.new("UIPadding",FPScroll)
+FPPad.PaddingLeft=UDim.new(0,px(12)); FPPad.PaddingRight=UDim.new(0,px(12)); FPPad.PaddingTop=UDim.new(0,px(4))
+FPLL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    FPScroll.CanvasSize=UDim2.new(0,0,0,FPLL.AbsoluteContentSize.Y+px(8))
+end)
+for i,fn in ipairs(FUNCS) do
+    local row=mkF(FPScroll,UDim2.new(1,0,0,FR_H),nil,C.bg2); row.ZIndex=36; row.LayoutOrder=i; cr(row,px(6)); st(row,fn.a and C.green or C.border,1)
+    mkF(row,UDim2.new(0,px(4),0.6,0),UDim2.new(0,0,0.2,0),fn.a and C.green or C.dim).ZIndex=37
+    local nm=mkT(row,fn.n,px(11),C.text,Enum.Font.GothamBold); nm.Size=UDim2.new(1,-px(84),0,px(14)); nm.Position=UDim2.new(0,px(10),0,px(IS_MOBILE and 8 or 5)); nm.ZIndex=37
+    local ds=mkT(row,fn.d,px(9),C.dim,Enum.Font.Gotham); ds.Size=UDim2.new(1,-px(84),0,px(12)); ds.Position=UDim2.new(0,px(10),0,px(IS_MOBILE and 26 or 21)); ds.ZIndex=37
+    local bF=mkF(row,UDim2.new(0,px(60),0,px(IS_MOBILE and 24 or 20)),UDim2.new(1,-px(66),0.5,-px(IS_MOBILE and 12 or 10)),fn.a and Color3.fromRGB(12,38,24) or Color3.fromRGB(38,12,12))
+    bF.ZIndex=37; cr(bF,px(5)); st(bF,fn.a and C.green or C.red,1)
+    mkT(bF,fn.a and "✓ Found" or "✗ Missing",px(9),fn.a and C.green or C.red,Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=38
+end
+local FP_BY=px(34)+px(IS_MOBILE and 230 or 150)+px(6)
+local FPBackF=mkF(FuncPage,UDim2.new(1,-px(24),0,px(IS_MOBILE and 40 or 30)),UDim2.new(0,px(12),0,FP_BY),C.bg3)
+FPBackF.ZIndex=35; cr(FPBackF,px(7)); st(FPBackF,C.border,1)
+local FPBackB=mkB(FPBackF,"← Back",px(12),C.mid,C.bg3); FPBackB.ZIndex=36; hov(FPBackB,C.bg3,C.bg2)
+
+local function slideOpen(p) p.Position=UDim2.new(1,0,0,0); tw(p,{Position=UDim2.new(0,0,0,0)},0.24,Enum.EasingStyle.Quad) end
+local function slideClose(p) tw(p,{Position=UDim2.new(1,0,0,0)},0.20,Enum.EasingStyle.Quad) end
+ExecBtn.MouseButton1Click:Connect(function() slideOpen(ExecPage) end)
+FuncBtn.MouseButton1Click:Connect(function() slideOpen(FuncPage) end)
+EPBackB.MouseButton1Click:Connect(function() slideClose(ExecPage) end)
+FPBackB.MouseButton1Click:Connect(function() slideClose(FuncPage) end)
+
+Card.BackgroundTransparency=1
+Card.Size=UDim2.new(0,CARD_W*0.85,0,CARD_H*0.85)
+Card.Position=UDim2.new(0.5,-(CARD_W*0.85)/2,0.5,-(CARD_H*0.85)/2)
+for _,v in ipairs(Card:GetDescendants()) do
+    if v:IsA("TextLabel") or v:IsA("TextButton") then v.TextTransparency=1 end
+end
+task.spawn(function()
+    task.wait(0.05)
+    tw(Card,{BackgroundTransparency=0,Size=UDim2.new(0,CARD_W,0,CARD_H),
+        Position=UDim2.new(0.5,-CARD_W/2,0.5,-CARD_H/2)},0.38,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+    task.wait(0.2)
+    for _,v in ipairs(Card:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextButton") then tw(v,{TextTransparency=0},0.22) end
+    end
+end)
+
+-- ══════════════════════════════════════════════════════
+--  ████  MAIN WINDOW
+-- ══════════════════════════════════════════════════════
+local WIN_W  = px(IS_MOBILE and 360 or 400)
+local WIN_H  = px(IS_MOBILE and 520 or 560)
+local TBAR_H = px(50)
+local PAD    = px(10)
+
+local win=mkF(Root,UDim2.new(0,WIN_W,0,WIN_H),UDim2.new(0,20,0.5,-(WIN_H/2)),C.bg0)
+win.BackgroundTransparency=0.05; win.Visible=false; win.ClipsDescendants=true
+cr(win,px(12)); st(win,C.acc,1)
+
+-- Title bar
+local tbar=mkF(win,UDim2.new(1,0,0,TBAR_H),UDim2.new(0,0,0,0),C.bg1)
+cr(tbar,px(12)); mkF(tbar,UDim2.new(1,0,0,px(12)),UDim2.new(0,0,1,-px(12)),C.bg1)
+local titL=mkT(tbar,"👥  VOID FRIENDS  v1",px(13),C.acc,Enum.Font.GothamBold)
+titL.Size=UDim2.new(1,-px(44),0,px(18)); titL.Position=UDim2.new(0,px(12),0,px(6))
+local authL=mkT(tbar,"made by @voiditic_456",px(9),C.dim,Enum.Font.Gotham)
+authL.Size=UDim2.new(1,-px(44),0,px(13)); authL.Position=UDim2.new(0,px(12),0,px(26))
+local rsBadge=mkF(tbar,UDim2.new(0,px(28),0,px(16)),UDim2.new(1,-px(34),0.5,-px(8)),C.bg3)
+cr(rsBadge,px(4)); mkT(rsBadge,"RS",px(8),C.dim,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+mkF(win,UDim2.new(1,0,0,2),UDim2.new(0,0,0,TBAR_H),C.acc)
+makeDrag(tbar,win)
+UIS.InputBegan:Connect(function(i,g)
+    if not g and i.KeyCode==Enum.KeyCode.RightShift then win.Visible=not win.Visible end
+end)
+
+-- ── STATS BAR ──────────────────────────────────────
+local statsBar=mkF(win,UDim2.new(1,0,0,px(26)),UDim2.new(0,0,0,TBAR_H+2),C.bg2)
+local statsL=mkT(statsBar,"Loading friends…",px(10),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+statsL.Size=UDim2.new(1,0,1,0)
+
+-- ── TABS: Friends / Log ────────────────────────────
+local TAB_Y = TBAR_H+2+px(26)
+local tabBar=mkF(win,UDim2.new(1,0,0,px(32)),UDim2.new(0,0,0,TAB_Y),C.bg1)
+mkF(tabBar,UDim2.new(1,0,0,1),UDim2.new(0,0,1,-1),C.border)
+
+local tabDefs = {
+    {k="friends", lbl="👥  Friends"},
+    {k="log",     lbl="📋  Session Log"},
+}
+local tabBtnRefs={}
+local activeTab="friends"
+local tabW=math.floor((WIN_W)/2)
+
+local friendsPage, logPage
+
+local function switchTab(k)
+    activeTab=k
+    for _,v in pairs(tabBtnRefs) do
+        tw(v.f,{BackgroundColor3=C.bg1},0.1); v.b.TextColor3=C.dim; v.b.BackgroundColor3=C.bg1
+        v.line.BackgroundTransparency=1
+    end
+    local ref=tabBtnRefs[k]
+    tw(ref.f,{BackgroundColor3=C.bg2},0.1); ref.b.TextColor3=C.acc; ref.b.BackgroundColor3=C.bg2
+    ref.line.BackgroundTransparency=0
+    if k=="friends" then
+        friendsPage.Visible=true; logPage.Visible=false
+    else
+        friendsPage.Visible=false; logPage.Visible=true
+    end
+end
+
+for i,td in ipairs(tabDefs) do
+    local bx=(i-1)*tabW
+    local f=mkF(tabBar,UDim2.new(0,tabW,1,0),UDim2.new(0,bx,0,0),C.bg1)
+    local b=mkB(f,td.lbl,px(11),C.dim,C.bg1)
+    -- Active underline
+    local line=mkF(f,UDim2.new(0.7,0,0,2),UDim2.new(0.15,0,1,-2),C.acc,1); cr(line,px(1))
+    tabBtnRefs[td.k]={f=f,b=b,line=line}
+    b.MouseButton1Click:Connect(function() switchTab(td.k) end)
+end
+
+local CONTENT_TOP = TAB_Y + px(32)
+
+-- ── FILTER + SORT BAR ──────────────────────────────
+local filterY = CONTENT_TOP
+local filterBar=mkF(win,UDim2.new(1,0,0,px(34)),UDim2.new(0,0,0,filterY),C.bg1)
+mkF(filterBar,UDim2.new(1,0,0,1),UDim2.new(0,0,1,-1),C.border)
+
+-- Search box
+local searchF=mkF(filterBar,UDim2.new(0,px(IS_MOBILE and 140 or 150),0,px(22)),UDim2.new(0,PAD,0,px(6)),C.bg3)
+cr(searchF,px(5)); st(searchF,C.border,1)
+local searchBox=Instance.new("TextBox"); searchBox.Parent=searchF
+searchBox.Size=UDim2.new(1,-px(6),1,0); searchBox.Position=UDim2.new(0,px(3),0,0)
+searchBox.BackgroundTransparency=1; searchBox.BorderSizePixel=0
+searchBox.Text=""; searchBox.PlaceholderText="🔍 Search name…"
+searchBox.TextColor3=C.text; searchBox.PlaceholderColor3=C.dim
+searchBox.Font=Enum.Font.Gotham; searchBox.TextSize=px(10)
+searchBox.TextXAlignment=Enum.TextXAlignment.Left; searchBox.ClearTextOnFocus=false
+
+-- Filter toggles
+local filterMode = "all"  -- "all" | "online" | "ingame"
+local filterDefs = {{k="all",lbl="All"},{k="online",lbl="Online"},{k="ingame",lbl="In Game"}}
+local filterBtnRefs = {}
+local fBW = math.floor((WIN_W - PAD*2 - px(IS_MOBILE and 140 or 150) - px(4)*3) / 3)
+for i,fd in ipairs(filterDefs) do
+    local bx = PAD + px(IS_MOBILE and 140 or 150) + px(4) + (i-1)*(fBW+px(3))
+    local f=mkF(filterBar,UDim2.new(0,fBW,0,px(22)),UDim2.new(0,bx,0,px(6)),
+        filterMode==fd.k and C.acc or C.bg3)
+    cr(f,px(5))
+    local b=mkB(f,fd.lbl,px(9),filterMode==fd.k and C.bg0 or C.dim,
+        filterMode==fd.k and C.acc or C.bg3)
+    filterBtnRefs[fd.k]={f=f,b=b}
+    b.MouseButton1Click:Connect(function()
+        filterMode=fd.k
+        for _,v in pairs(filterBtnRefs) do
+            tw(v.f,{BackgroundColor3=C.bg3},0.1); v.b.TextColor3=C.dim; v.b.BackgroundColor3=C.bg3
+        end
+        tw(f,{BackgroundColor3=C.acc},0.1); b.TextColor3=C.bg0; b.BackgroundColor3=C.acc
+        renderFriends()
+    end)
+end
+
+-- Sort row
+local sortY = filterY + px(34)
+local sortBar=mkF(win,UDim2.new(1,0,0,px(30)),UDim2.new(0,0,0,sortY),C.bg1)
+mkF(sortBar,UDim2.new(1,0,0,1),UDim2.new(0,0,1,-1),C.border)
+
+local sortMode = "online"  -- "online" | "az" | "recent"
+local sortDefs = {{k="online",lbl="Online First"},{k="az",lbl="A → Z"},{k="recent",lbl="Recent"}}
+local sortBtnRefs={}
+local sBW=math.floor((WIN_W-PAD*2-px(4)*2)/3)
+for i,sd in ipairs(sortDefs) do
+    local bx=PAD+(i-1)*(sBW+px(4))
+    local f=mkF(sortBar,UDim2.new(0,sBW,0,px(20)),UDim2.new(0,bx,0,px(5)),
+        sortMode==sd.k and C.acc or C.bg3)
+    cr(f,px(5))
+    local b=mkB(f,sd.lbl,px(9),sortMode==sd.k and C.bg0 or C.dim,
+        sortMode==sd.k and C.acc or C.bg3)
+    sortBtnRefs[sd.k]={f=f,b=b}
+    b.MouseButton1Click:Connect(function()
+        sortMode=sd.k
+        for _,v in pairs(sortBtnRefs) do
+            tw(v.f,{BackgroundColor3=C.bg3},0.1); v.b.TextColor3=C.dim; v.b.BackgroundColor3=C.bg3
+        end
+        tw(f,{BackgroundColor3=C.acc},0.1); b.TextColor3=C.bg0; b.BackgroundColor3=C.acc
+        renderFriends()
+    end)
+end
+
+local LIST_TOP = sortY + px(30)
+
+-- ── FRIENDS PAGE ───────────────────────────────────
+friendsPage=mkF(win,UDim2.new(1,0,1,-(LIST_TOP+px(44))),UDim2.new(0,0,0,LIST_TOP),C.bg0,1)
+friendsPage.ClipsDescendants=true
+
+local friendScroll=Instance.new("ScrollingFrame")
+friendScroll.Size=UDim2.new(1,0,1,0); friendScroll.BackgroundTransparency=1
+friendScroll.BorderSizePixel=0; friendScroll.ScrollBarThickness=4
+friendScroll.ScrollBarImageColor3=C.acc; friendScroll.CanvasSize=UDim2.new(0,0,0,0)
+friendScroll.Parent=friendsPage
+
+local fLL=Instance.new("UIListLayout"); fLL.SortOrder=Enum.SortOrder.LayoutOrder
+fLL.Padding=UDim.new(0,px(5)); fLL.Parent=friendScroll
+local fPad=Instance.new("UIPadding",friendScroll)
+fPad.PaddingTop=UDim.new(0,px(5)); fPad.PaddingBottom=UDim.new(0,px(5))
+fLL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    friendScroll.CanvasSize=UDim2.new(0,0,0,fLL.AbsoluteContentSize.Y+px(10))
+end)
+
+-- ── SESSION LOG PAGE ───────────────────────────────
+logPage=mkF(win,UDim2.new(1,0,1,-(LIST_TOP+px(44))),UDim2.new(0,0,0,LIST_TOP),C.bg0,1)
+logPage.Visible=false; logPage.ClipsDescendants=true
+
+local logScroll=Instance.new("ScrollingFrame")
+logScroll.Size=UDim2.new(1,0,1,0); logScroll.BackgroundTransparency=1
+logScroll.BorderSizePixel=0; logScroll.ScrollBarThickness=4
+logScroll.ScrollBarImageColor3=C.acc; logScroll.CanvasSize=UDim2.new(0,0,0,0)
+logScroll.Parent=logPage
+
+local lLL=Instance.new("UIListLayout"); lLL.SortOrder=Enum.SortOrder.LayoutOrder
+lLL.Padding=UDim.new(0,px(3)); lLL.Parent=logScroll
+local lPad=Instance.new("UIPadding",logScroll)
+lPad.PaddingTop=UDim.new(0,px(6)); lPad.PaddingLeft=UDim.new(0,px(10)); lPad.PaddingRight=UDim.new(0,px(10))
+lLL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    logScroll.CanvasSize=UDim2.new(0,0,0,lLL.AbsoluteContentSize.Y+px(10))
+end)
+local logOrder=0
+
+local function addLog(txt, col)
+    logOrder+=1
+    local ts=os.date("%H:%M")
+    local l=mkT(logScroll,"["..ts.."]  "..txt,px(10),col or C.mid,Enum.Font.Gotham)
+    l.Size=UDim2.new(1,0,0,px(16)); l.LayoutOrder=logOrder
+    logScroll.CanvasPosition=Vector2.new(0,math.max(0,lLL.AbsoluteContentSize.Y-logScroll.AbsoluteSize.Y))
+end
+
+-- ── BOTTOM BAR ─────────────────────────────────────
+local botBar=mkF(win,UDim2.new(1,0,0,px(44)),UDim2.new(0,0,1,-px(44)),C.bg1)
+mkF(botBar,UDim2.new(1,0,0,1),UDim2.new(0,0,0,0),C.border)
+
+local BW2=math.floor((WIN_W-PAD*2-px(4))/2)
+
+-- Refresh button with countdown
+local refF=mkF(botBar,UDim2.new(0,BW2,0,px(28)),UDim2.new(0,PAD,0,px(8)),C.acc)
+cr(refF,px(7))
+local refB=mkB(refF,"🔄  Refresh",px(11),C.bg0,C.acc); hov(refB,C.acc,C.accL)
+
+-- Follow mode button
+local followF=mkF(botBar,UDim2.new(0,BW2,0,px(28)),UDim2.new(0,PAD+BW2+px(4),0,px(8)),C.bg2)
+cr(followF,px(7)); st(followF,C.cyan,1)
+local followB=mkB(followF,"🎯  Follow: OFF",px(11),C.dim,C.bg2); hov(followB,C.bg2,C.bg3)
+
+-- ══════════════════════════════════════════════════════
+--  TOAST NOTIFICATION
+-- ══════════════════════════════════════════════════════
+local toastF=mkF(Root,UDim2.new(0,px(260),0,px(44)),UDim2.new(0.5,-px(130),0,-px(50)),C.bg1)
+toastF.ZIndex=200; cr(toastF,px(10)); st(toastF,C.green,1)
+local toastL=mkT(toastF,"",px(11),C.text,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+toastL.ZIndex=201; toastL.Size=UDim2.new(1,-px(10),1,0); toastL.Position=UDim2.new(0,px(5),0,0)
+local toastActive=false
+
+local function showToast(msg, col)
+    if toastActive then return end; toastActive=true
+    toastL.Text=msg
+    st(toastF, col or C.green, 1)
+    tw(toastF,{Position=UDim2.new(0.5,-px(130),0,px(16))},0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+    task.delay(3, function()
+        tw(toastF,{Position=UDim2.new(0.5,-px(130),0,-px(50))},0.25,Enum.EasingStyle.Quad,Enum.EasingDirection.In)
+        task.wait(0.3); toastActive=false
+    end)
+end
+
+-- ══════════════════════════════════════════════════════
+--  STATE
+-- ══════════════════════════════════════════════════════
+local friendData    = {}   -- { userId, name, presence, gameId, gameName, placeId, lastOnline }
+local prevPresence  = {}   -- userId -> last known presence type
+local followTarget  = nil  -- userId to follow
+local followThread  = nil
+local autoRefTimer  = 30
+local autoRefTick   = tick()
+
+-- Presence helpers
+local PRESENCE = {
+    [0] = {lbl="Offline",  col=function() return C.dim   end, dot=Color3.fromRGB(71,85,105)},
+    [1] = {lbl="Online",   col=function() return C.green  end, dot=Color3.fromRGB(52,211,153)},
+    [2] = {lbl="In Game",  col=function() return C.acc    end, dot=Color3.fromRGB(139,92,246)},
+    [3] = {lbl="Studio",   col=function() return C.yellow end, dot=Color3.fromRGB(251,191,36)},
+}
+local function presInfo(t) return PRESENCE[t] or PRESENCE[0] end
+
+-- ── BUILD FRIEND CARD ─────────────────────────────
+local FCARD_H = px(IS_MOBILE and 80 or 72)
+local function buildFriendCard(f, order)
+    local pInfo = presInfo(f.presence)
+    local isFollowing = followTarget == f.userId
+
+    local card=mkF(friendScroll,UDim2.new(1,-PAD*2,0,FCARD_H),UDim2.new(0,PAD,0,0),C.bg2)
+    card.LayoutOrder=order; cr(card,px(8))
+    st(card, isFollowing and C.cyan or (f.presence>0 and C.border or Color3.fromRGB(30,30,50)), 1)
+
+    -- Presence dot
+    local dot=mkF(card,UDim2.new(0,px(10),0,px(10)),UDim2.new(0,px(7),0.5,-px(5)),pInfo.dot)
+    cr(dot,px(5))
+
+    -- Avatar — real thumbnail via GetUserThumbnailAsync (native, no HTTP needed)
+    local avF=mkF(card,UDim2.new(0,px(40),0,px(40)),UDim2.new(0,px(20),0.5,-px(20)),C.bg3)
+    cr(avF,px(8)); st(avF,pInfo.dot,1)
+
+    -- ImageLabel sits inside avF
+    local avImg=Instance.new("ImageLabel")
+    avImg.Size=UDim2.new(1,0,1,0); avImg.BackgroundTransparency=1
+    avImg.BorderSizePixel=0; avImg.Image=""
+    avImg.ScaleType=Enum.ScaleType.Crop; avImg.Parent=avF
+    cr(avImg,px(8))
+
+    -- Fallback initial shown while thumbnail loads
+    local initL=mkT(avF,string.upper(string.sub(f.name,1,1)),px(18),pInfo.dot,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+    initL.ZIndex=2
+
+    -- Fetch thumbnail in background — swap to image when ready
+    task.spawn(function()
+        local ok, url = pcall(function()
+            return Players:GetUserThumbnailAsync(
+                f.userId,
+                Enum.ThumbnailType.HeadShot,
+                Enum.ThumbnailSize.Size100x100
+            )
+        end)
+        if ok and url and url~="" then
+            avImg.Image=url
+            initL.Visible=false  -- hide initial once real image loaded
+        end
+    end)
+
+    -- Name
+    local nameL=mkT(card,f.name,px(12),f.presence>0 and C.white or C.dim,Enum.Font.GothamBold)
+    nameL.Size=UDim2.new(0.55,0,0,px(16)); nameL.Position=UDim2.new(0,px(66),0,px(8))
+    nameL.TextTruncate=Enum.TextTruncate.AtEnd
+
+    -- Presence pill
+    local pillW=px(IS_MOBILE and 60 or 64)
+    local pillF=mkF(card,UDim2.new(0,pillW,0,px(16)),UDim2.new(0,px(66),0,px(26)),C.bg3)
+    cr(pillF,px(5))
+    local pillCol = pInfo.dot
+    st(pillF,pillCol,1)
+    mkT(pillF,pInfo.lbl,px(8),pillCol,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+
+    -- Game name
+    if f.presence==2 and f.gameName then
+        local gameL=mkT(card,f.gameName,px(9),C.acc,Enum.Font.Gotham)
+        gameL.Size=UDim2.new(0.65,0,0,px(13)); gameL.Position=UDim2.new(0,px(66),0,px(46))
+        gameL.TextTruncate=Enum.TextTruncate.AtEnd
+    elseif f.presence==1 then
+        local onlineL=mkT(card,"On Roblox website",px(9),C.dim,Enum.Font.Gotham)
+        onlineL.Size=UDim2.new(0.65,0,0,px(13)); onlineL.Position=UDim2.new(0,px(66),0,px(46))
+    elseif f.presence==3 then
+        local studioL=mkT(card,"In Roblox Studio",px(9),C.yellow,Enum.Font.Gotham)
+        studioL.Size=UDim2.new(0.65,0,0,px(13)); studioL.Position=UDim2.new(0,px(66),0,px(46))
+    end
+
+    -- Following badge
+    if isFollowing then
+        local fBadge=mkF(card,UDim2.new(0,px(54),0,px(14)),UDim2.new(1,-px(58),0,px(6)),C.cyan)
+        cr(fBadge,px(4))
+        mkT(fBadge,"Following",px(7),C.bg0,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+    end
+
+    -- JOIN button (only if in game and has placeId)
+    local btnX = WIN_W - PAD*2 - px(66) - px(4)
+    if f.presence==2 and f.placeId then
+        local jF=mkF(card,UDim2.new(0,px(60),0,px(22)),UDim2.new(1,-px(64),0,px(6)),C.acc)
+        cr(jF,px(6))
+        local jB=mkB(jF,"Join",px(10),C.bg0,C.acc); hov(jB,C.acc,C.accL)
+        jB.MouseButton1Click:Connect(function()
+            tw(jF,{BackgroundColor3=C.green},0.1); jB.Text="✓"
+            task.spawn(function()
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(f.placeId, f.gameId or game.JobId, lp)
+                end)
+            end)
+            task.delay(2,function() jB.Text="Join"; tw(jF,{BackgroundColor3=C.acc},0.15) end)
+        end)
+
+        -- Follow/Unfollow toggle
+        local flF=mkF(card,UDim2.new(0,px(60),0,px(22)),UDim2.new(1,-px(64),0,px(32)),
+            isFollowing and C.cyan or C.bg3)
+        cr(flF,px(6)); if not isFollowing then st(flF,C.border,1) end
+        local flB=mkB(flF,isFollowing and "Unfollow" or "Follow",px(10),
+            isFollowing and C.bg0 or C.dim, isFollowing and C.cyan or C.bg3)
+        flB.MouseButton1Click:Connect(function()
+            if followTarget==f.userId then
+                followTarget=nil
+                if followThread then task.cancel(followThread); followThread=nil end
+                followB.Text="🎯  Follow: OFF"; followB.TextColor3=C.dim
+                tw(followF,{BackgroundColor3=C.bg2})
+                addLog("Stopped following "..f.name, C.dim)
+            else
+                followTarget=f.userId
+                followB.Text="🎯  Following: "..f.name; followB.TextColor3=C.cyan
+                tw(followF,{BackgroundColor3=Color3.fromRGB(10,35,45)})
+                addLog("Now following "..f.name, C.cyan)
+                startFollow(f)
+            end
+            renderFriends()
+        end)
+    end
+
+    -- Copy profile button
+    local cpF=mkF(card,UDim2.new(0,px(60),0,px(22)),
+        f.presence==2 and f.placeId and UDim2.new(1,-px(64),0,px(6+22+4)) or UDim2.new(1,-px(64),0,px(6)),
+        C.bg3)
+    cr(cpF,px(6)); st(cpF,C.border,1)
+    local cpB=mkB(cpF,"Copy URL",px(10),C.dim,C.bg3); hov(cpB,C.bg3,C.bg2)
+    cpB.MouseButton1Click:Connect(function()
+        pcall(function() setclipboard("https://www.roblox.com/users/"..f.userId.."/profile") end)
+        tw(cpF,{BackgroundColor3=C.green},0.1); cpB.Text="✓"; cpB.TextColor3=C.white
+        task.delay(1.5,function() tw(cpF,{BackgroundColor3=C.bg3},0.15); cpB.Text="Copy URL"; cpB.TextColor3=C.dim end)
+    end)
+
+    return card
+end
+
+-- ── RENDER ────────────────────────────────────────
+function renderFriends()
+    -- Clear old cards
+    for _,c in ipairs(friendScroll:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+
+    local search = string.lower(searchBox.Text or "")
+    local list = {}
+
+    for _,f in ipairs(friendData) do
+        -- Filter
+        if filterMode=="online" and f.presence==0 then continue end
+        if filterMode=="ingame" and f.presence~=2 then continue end
+        if search~="" and not string.find(string.lower(f.name), search, 1, true) then continue end
+        table.insert(list, f)
+    end
+
+    -- Sort
+    if sortMode=="online" then
+        table.sort(list,function(a,b)
+            if a.presence~=b.presence then return a.presence>b.presence end
+            return a.name<b.name
+        end)
+    elseif sortMode=="az" then
+        table.sort(list,function(a,b) return a.name<b.name end)
+    elseif sortMode=="recent" then
+        table.sort(list,function(a,b)
+            return (a.lastOnline or 0)>(b.lastOnline or 0)
+        end)
+    end
+
+    if #list==0 then
+        local empty=mkF(friendScroll,UDim2.new(1,-PAD*2,0,px(50)),UDim2.new(0,PAD,0,0),C.bg2)
+        empty.LayoutOrder=1; cr(empty,px(8))
+        mkT(empty,"No friends match your filter",px(11),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+        return
+    end
+
+    for i,f in ipairs(list) do
+        buildFriendCard(f, i)
+    end
+end
+
+-- ── FOLLOW MODE ───────────────────────────────────
+function startFollow(target)
+    if followThread then task.cancel(followThread) end
+    followThread=task.spawn(function()
+        while followTarget==target.userId do
+            -- Re-fetch this friend's presence
+            task.spawn(function()
+                local ok,res=pcall(function()
+                    local r=(request or http_request)({
+                        Url="https://presence.roblox.com/v1/presence/users",
+                        Method="POST",
+                        Headers={["Content-Type"]="application/json"},
+                        Body=HttpService:JSONEncode({userIds={target.userId}})
+                    })
+                    return HttpService:JSONDecode(r.Body)
+                end)
+                if ok and res and res.userPresences and res.userPresences[1] then
+                    local p=res.userPresences[1]
+                    if p.userPresenceType==2 and p.gameId then
+                        pcall(function()
+                            TeleportService:TeleportToPlaceInstance(
+                                p.rootPlaceId or game.PlaceId, p.gameId, lp)
+                        end)
+                    end
+                end
+            end)
+            task.wait(10)
+        end
+    end)
+end
+
+followB.MouseButton1Click:Connect(function()
+    if followTarget then
+        followTarget=nil
+        if followThread then task.cancel(followThread); followThread=nil end
+        followB.Text="🎯  Follow: OFF"; followB.TextColor3=C.dim
+        tw(followF,{BackgroundColor3=C.bg2})
+        addLog("Stopped following", C.dim)
+        renderFriends()
+    end
+end)
+
+-- ── FETCH FRIENDS + PRESENCE ──────────────────────
+local function fetchFriends()
+    statsL.Text="Refreshing…"; statsL.TextColor3=C.dim
+
+    task.spawn(function()
+        -- Step 1: get friend list via native Roblox API (no HTTP needed, works in all executors)
+        local ids    = {}
+        local nameMap= {}
+
+        local ok1 = pcall(function()
+            local pages = Players:GetFriendsAsync(lp.UserId)
+            while true do
+                for _, f in ipairs(pages:GetCurrentPage()) do
+                    table.insert(ids, f.Id)
+                    nameMap[f.Id] = f.DisplayName or f.Username or ("User "..f.Id)
+                end
+                if pages.IsFinished then break end
+                pages:AdvanceToNextPageAsync()
+            end
+        end)
+
+        if not ok1 then
+            statsL.Text="Failed to load friends list"; statsL.TextColor3=C.red
+            return
+        end
+
+        if #ids==0 then
+            statsL.Text="No friends found"; statsL.TextColor3=C.dim
+            friendData={}; renderFriends(); return
+        end
+
+        -- Step 2: batch presence
+        -- presence.roblox.com requires the .ROBLOSECURITY cookie to return real data.
+        -- We try to get it from the executor automatically.
+        local presMap = {}
+        local hasHttp = type(request)=="function" or type(http_request)=="function"
+        local httpFn  = request or http_request
+
+        -- Try to grab the auth cookie from the executor
+        local cookie = ""
+        pcall(function()
+            if type(getcookies)=="function" then
+                -- Some executors (Synapse, etc.)
+                for _,c in ipairs(getcookies()) do
+                    if c.Name==".ROBLOSECURITY" then cookie=c.Value; break end
+                end
+            end
+        end)
+        if cookie=="" then
+            pcall(function()
+                -- Fallback: some executors expose it directly
+                cookie = game:GetService("RbxAnalyticsService"):GetClientId()
+            end)
+        end
+
+        -- Build auth headers
+        local headers = {["Content-Type"]="application/json"}
+        if cookie~="" then
+            headers["Cookie"] = ".ROBLOSECURITY="..cookie
+        end
+
+        if hasHttp then
+            -- Split into chunks of 50 (API limit)
+            local chunks={}; local chunk={}
+            for _,id in ipairs(ids) do
+                table.insert(chunk,id)
+                if #chunk==50 then table.insert(chunks,chunk); chunk={} end
+            end
+            if #chunk>0 then table.insert(chunks,chunk) end
+
+            for _,ch in ipairs(chunks) do
+                local ok2,presData=pcall(function()
+                    local r=httpFn({
+                        Url    ="https://presence.roblox.com/v1/presence/users",
+                        Method ="POST",
+                        Headers=headers,
+                        Body   =HttpService:JSONEncode({userIds=ch})
+                    })
+                    return HttpService:JSONDecode(r.Body)
+                end)
+                if ok2 and presData and presData.userPresences then
+                    for _,p in ipairs(presData.userPresences) do
+                        presMap[p.userId]=p
+                    end
+                end
+            end
+
+            -- Check if all came back as 0 (cookie not injected / not authenticated)
+            local allOffline=true
+            for _,p in pairs(presMap) do
+                if (p.userPresenceType or 0)>0 then allOffline=false; break end
+            end
+            if allOffline and next(presMap) then
+                -- Cookie probably wasn't injected — warn but still show friends
+                addLog("⚠ Presence shows all offline — your executor may not inject cookies", C.yellow)
+            end
+        else
+            addLog("⚠ No request() found — presence unavailable, friends listed without status", C.yellow)
+        end
+
+        -- Step 3: build friendData + detect changes
+        local newData = {}
+        local onlineCount = 0
+        local inGameCount = 0
+
+        for _,id in ipairs(ids) do
+            local p = presMap[id] or {}
+            local presType = p.userPresenceType or 0
+            local entry = {
+                userId     = id,
+                name       = nameMap[id],
+                presence   = presType,
+                gameId     = p.gameId,
+                gameName   = p.lastLocation,
+                placeId    = p.rootPlaceId,
+                lastOnline = tick(),
+            }
+            table.insert(newData, entry)
+
+            if presType>0 then onlineCount+=1 end
+            if presType==2 then inGameCount+=1 end
+
+            -- Detect friend coming online since last fetch
+            local prev = prevPresence[id]
+            if prev~=nil then
+                if prev==0 and presType>0 then
+                    local label = presType==2 and (nameMap[id].." is now in-game!") or (nameMap[id].." came online!")
+                    local col   = presType==2 and C.acc or C.green
+                    showToast("👥 "..label, col)
+                    addLog(nameMap[id].." came online", col)
+                elseif prev>0 and presType==0 then
+                    addLog(nameMap[id].." went offline", C.dim)
+                elseif prev==1 and presType==2 then
+                    addLog(nameMap[id].." started playing "..((p.lastLocation or "a game")), C.acc)
+                end
+            end
+            prevPresence[id] = presType
+        end
+
+        friendData = newData
+
+        statsL.Text=string.format("%d friends  •  %d online  •  %d in-game",
+            #friendData, onlineCount, inGameCount)
+        statsL.TextColor3=C.mid
+
+        renderFriends()
+        autoRefTick=tick()
+    end)
+end
+
+-- ── SEARCH ────────────────────────────────────────
+searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    renderFriends()
+end)
+
+-- ── REFRESH BUTTON ────────────────────────────────
+refB.MouseButton1Click:Connect(function()
+    tw(refF,{BackgroundColor3=C.accL},0.1)
+    task.delay(0.15,function() tw(refF,{BackgroundColor3=C.acc},0.15) end)
+    fetchFriends()
+end)
+
+-- ── AUTO-REFRESH COUNTDOWN ────────────────────────
+RunService.Heartbeat:Connect(function()
+    local remaining = math.max(0, autoRefTimer - (tick()-autoRefTick))
+    if remaining<=0 then
+        autoRefTick=tick()
+        fetchFriends()
+    else
+        refB.Text=string.format("🔄  Refresh (%ds)", math.ceil(remaining))
+    end
+end)
+
+-- ── CONTINUE ──────────────────────────────────────
+ContB.MouseButton1Click:Connect(function()
+    tw(Backdrop,{BackgroundTransparency=1},0.3)
+    for _,v in ipairs(Backdrop:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextButton") then tw(v,{TextTransparency=1},0.2) end
+    end
+    tw(Card,{BackgroundTransparency=1,Size=UDim2.new(0,CARD_W*0.85,0,CARD_H*0.85)},
+        0.3,Enum.EasingStyle.Back,Enum.EasingDirection.In)
+    task.delay(0.35,function()
+        Backdrop:Destroy()
+        win.Visible=true
+        win.Size=UDim2.new(0,WIN_W,0,0)
+        tw(win,{Size=UDim2.new(0,WIN_W,0,WIN_H)},0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+        switchTab("friends")
+        task.delay(0.25,function() fetchFriends() end)
+    end)
+end)
+
+print("[ VOID FRIENDS v1 ] ✓ | @voiditic_456 | discord.gg/9XTXAseJ5r")
+print("[ VOID FRIENDS ] Press Continue, RightShift toggles window")
