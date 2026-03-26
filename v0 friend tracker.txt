@@ -172,65 +172,62 @@ Root.IgnoreGuiInset=false; Root.Parent=pg
 -- ══════════════════════════════════════════════════════
 --  ████  SPLASH CARD
 -- ══════════════════════════════════════════════════════
-local CARD_W = px(IS_MOBILE and 330 or 360)
-local CARD_H = px(IS_MOBILE and 400 or 345)
+local CARD_W = px(IS_MOBILE and 310 or 342)
+local CARD_H = px(IS_MOBILE and 418 or 366)
 
+-- Clean minimal backdrop — no grid lines, no glow blobs
 local Backdrop=mkF(Root,UDim2.new(1,0,1,0),UDim2.new(0,0,0,0),C.bg0)
-Backdrop.ZIndex=30
-for i=1,12 do mkF(Backdrop,UDim2.new(0,1,1,0),UDim2.new(i/13,0,0,0),C.acc,0.92).ZIndex=30 end
-for i=1,7  do mkF(Backdrop,UDim2.new(1,0,0,1),UDim2.new(0,0,i/8,0),C.acc,0.92).ZIndex=30  end
-local Glow=mkF(Backdrop,UDim2.new(0,px(500),0,px(500)),UDim2.new(0.5,-px(250),0.5,-px(250)),C.acc,0.82)
-Glow.ZIndex=30; cr(Glow,px(250))
+Backdrop.BackgroundTransparency=0.08; Backdrop.ZIndex=30
 
 local Card=mkF(Backdrop,UDim2.new(0,CARD_W,0,CARD_H),UDim2.new(0.5,-CARD_W/2,0.5,-CARD_H/2),C.bg1,1)
-Card.ZIndex=31; Card.ClipsDescendants=true; cr(Card,px(20)); st(Card,C.acc,1)
+Card.ZIndex=31; Card.ClipsDescendants=true; cr(Card,px(14)); st(Card,C.border,1)
 
-local TopBar=mkF(Card,UDim2.new(1,0,0,px(3)),UDim2.new(0,0,0,0),C.bg0)
-TopBar.ZIndex=32; cr(TopBar,px(20))
-mkF(TopBar,UDim2.new(1,0,0,px(10)),UDim2.new(0,0,1,-px(10)),C.bg0).ZIndex=32
-animGrad(TopBar,{Color3.fromRGB(139,92,246),Color3.fromRGB(34,211,238),Color3.fromRGB(52,211,153),Color3.fromRGB(139,92,246)})
+-- Simple 2px accent bar at top — no animated gradient that bleeds outside the card
+mkF(Card,UDim2.new(1,-px(28),0,px(2)),UDim2.new(0,px(14),0,0),C.acc).ZIndex=32
 
-local PBadgeF=mkF(Card,UDim2.new(0,px(72),0,px(22)),UDim2.new(1,-px(78),0,px(10)),
-    IS_MOBILE and Color3.fromRGB(15,40,28) or Color3.fromRGB(20,15,50))
-PBadgeF.ZIndex=32; cr(PBadgeF,px(10)); st(PBadgeF,IS_MOBILE and C.green or C.acc,1)
-mkT(PBadgeF,IS_MOBILE and "📱 Mobile" or "🖥 PC",px(9),IS_MOBILE and C.green or C.acc,
-    Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=33
+local PBadgeF=mkF(Card,UDim2.new(0,px(64),0,px(18)),UDim2.new(1,-px(70),0,px(10)),C.bg3)
+PBadgeF.ZIndex=32; cr(PBadgeF,px(5)); st(PBadgeF,C.border,1)
+mkT(PBadgeF,IS_MOBILE and "📱 Mobile" or "🖥 PC",px(8),C.dim,Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=33
 
-local IconF=mkF(Card,UDim2.new(0,px(56),0,px(56)),UDim2.new(0.5,-px(28),0,px(16)),C.bg3)
-IconF.ZIndex=32; cr(IconF,px(18)); st(IconF,C.acc,1)
-mkT(IconF,"👥",px(26),C.acc,Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=33
+local IconF=mkF(Card,UDim2.new(0,px(46),0,px(46)),UDim2.new(0.5,-px(23),0,px(16)),C.bg3)
+IconF.ZIndex=32; cr(IconF,px(14)); st(IconF,C.acc,1)
+mkT(IconF,"👥",px(23),C.acc,Enum.Font.GothamBold,Enum.TextXAlignment.Center).ZIndex=33
 
-local TitleL=mkT(Card,"VOID FRIENDS",px(25),C.white,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
-TitleL.Size=UDim2.new(1,0,0,px(30)); TitleL.Position=UDim2.new(0,0,0,px(84)); TitleL.ZIndex=32
+local TitleL=mkT(Card,"VOID FRIENDS",px(20),C.white,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
+TitleL.Size=UDim2.new(1,0,0,px(24)); TitleL.Position=UDim2.new(0,0,0,px(72)); TitleL.ZIndex=32
 
-local SubL=mkT(Card,"Friend Activity Tracker",px(11),C.mid,Enum.Font.Gotham,Enum.TextXAlignment.Center)
-SubL.Size=UDim2.new(1,0,0,px(14)); SubL.Position=UDim2.new(0,0,0,px(117)); SubL.ZIndex=32
+local SubL=mkT(Card,"Friend Activity Tracker",px(10),C.mid,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+SubL.Size=UDim2.new(1,0,0,px(14)); SubL.Position=UDim2.new(0,0,0,px(98)); SubL.ZIndex=32
 
-local AuthorL=mkT(Card,"by @voiditic_456 on Discord",px(11),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
-AuthorL.Size=UDim2.new(1,0,0,px(14)); AuthorL.Position=UDim2.new(0,0,0,px(133)); AuthorL.ZIndex=32
+local AuthorL=mkT(Card,"by @voiditic_456  •  GUI help from @dom_zygiie",px(9),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+AuthorL.Size=UDim2.new(1,0,0,px(13)); AuthorL.Position=UDim2.new(0,0,0,px(113)); AuthorL.ZIndex=32
 
-mkF(Card,UDim2.new(0.7,0,0,1),UDim2.new(0.15,0,0,px(153)),C.border).ZIndex=32
+-- thin separator
+mkF(Card,UDim2.new(1,-px(32),0,1),UDim2.new(0,px(16),0,px(130)),C.border).ZIndex=32
 
-local JoinL=mkT(Card,"🎮  Join Discord for more scripts!",px(12),C.acc,Enum.Font.GothamBold,Enum.TextXAlignment.Center)
-JoinL.Size=UDim2.new(1,0,0,px(16)); JoinL.Position=UDim2.new(0,0,0,px(160)); JoinL.ZIndex=32
+local JoinL=mkT(Card,"Join Discord for more scripts",px(9),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+JoinL.Size=UDim2.new(1,0,0,px(13)); JoinL.Position=UDim2.new(0,0,0,px(137)); JoinL.ZIndex=32
 
-local LinkWrap=mkF(Card,UDim2.new(1,-px(28),0,px(IS_MOBILE and 42 or 32)),UDim2.new(0,px(14),0,px(181)),C.bg0)
-LinkWrap.ZIndex=32; cr(LinkWrap,px(12)); st(LinkWrap,C.border,1)
-local LinkL=mkT(LinkWrap,"discord.gg/rgHWCthsVU",px(11),C.mid,Enum.Font.Gotham)
-LinkL.Size=UDim2.new(1,-px(84),1,0); LinkL.Position=UDim2.new(0,px(10),0,0); LinkL.ZIndex=33
-local CopyF=mkF(LinkWrap,UDim2.new(0,px(70),0,px(IS_MOBILE and 30 or 22)),
-    UDim2.new(1,-px(74),0.5,-px(IS_MOBILE and 15 or 11)),C.acc)
+local LinkWrap=mkF(Card,UDim2.new(1,-px(28),0,px(IS_MOBILE and 42 or 32)),UDim2.new(0,px(14),0,px(154)),C.bg2)
+LinkWrap.ZIndex=32; cr(LinkWrap,px(10)); st(LinkWrap,C.border,1)
+local LinkL=mkT(LinkWrap,"discord.gg/rgHWCthsVU",px(10),C.mid,Enum.Font.Gotham)
+LinkL.Size=UDim2.new(1,-px(78),1,0); LinkL.Position=UDim2.new(0,px(10),0,0); LinkL.ZIndex=33
+local CopyF=mkF(LinkWrap,UDim2.new(0,px(60),0,px(IS_MOBILE and 30 or 22)),
+    UDim2.new(1,-px(64),0.5,-px(IS_MOBILE and 15 or 11)),C.acc)
 CopyF.ZIndex=33; cr(CopyF,px(10))
-local CopyB=mkB(CopyF,"📋 Copy",px(10),C.bg0,C.acc); CopyB.ZIndex=34; hov(CopyB,C.acc,C.accL)
+local CopyB=mkB(CopyF,"📋 Copy",px(9),C.bg0,C.acc); CopyB.ZIndex=34
+CopyB.BackgroundTransparency=1; cr(CopyB,px(10))
+CopyB.MouseEnter:Connect(function() tw(CopyF,{BackgroundColor3=C.accL},0.1) end)
+CopyB.MouseLeave:Connect(function() tw(CopyF,{BackgroundColor3=C.acc},0.1) end)
 local _cp=false
 CopyB.MouseButton1Click:Connect(function()
     if _cp then return end; _cp=true
     pcall(function() setclipboard("https://discord.gg/rgHWCthsVU") end)
-    CopyB.Text="✓ Done!"; CopyB.TextColor3=C.green; tw(CopyF,{BackgroundColor3=C.green},0.1)
-    task.delay(2.5,function() _cp=false; CopyB.Text="📋 Copy"; CopyB.TextColor3=C.bg0; tw(CopyF,{BackgroundColor3=C.acc},0.2) end)
+    CopyB.Text="✓ Done!"; tw(CopyF,{BackgroundColor3=C.green},0.1)
+    task.delay(2.5,function() _cp=false; CopyB.Text="📋 Copy"; tw(CopyF,{BackgroundColor3=C.acc},0.2) end)
 end)
 
-local TILE_Y=px(IS_MOBILE and 233 or 220); local TILE_H=px(IS_MOBILE and 44 or 34)
+local TILE_Y=px(IS_MOBILE and 216 or 200); local TILE_H=px(IS_MOBILE and 40 or 32)
 local MARGIN=px(14); local TILE_W=math.floor((CARD_W-MARGIN*3)/2)
 
 -- Executors tile
@@ -532,7 +529,7 @@ end
 local LIST_TOP = sortY + px(30)
 
 -- ── FRIENDS PAGE ───────────────────────────────────
-friendsPage=mkF(win,UDim2.new(1,0,1,-(LIST_TOP+px(52))),UDim2.new(0,0,0,LIST_TOP),C.bg0,1)
+friendsPage=mkF(win,UDim2.new(1,0,1,-(LIST_TOP+px(52)+px(22))),UDim2.new(0,0,0,LIST_TOP),C.bg0,1)
 friendsPage.ClipsDescendants=true
 
 local friendScroll=Instance.new("ScrollingFrame")
@@ -550,7 +547,7 @@ fLL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 end)
 
 -- ── SESSION LOG PAGE ───────────────────────────────
-logPage=mkF(win,UDim2.new(1,0,1,-(LIST_TOP+px(52))),UDim2.new(0,0,0,LIST_TOP),C.bg0,1)
+logPage=mkF(win,UDim2.new(1,0,1,-(LIST_TOP+px(52)+px(22))),UDim2.new(0,0,0,LIST_TOP),C.bg0,1)
 logPage.Visible=false; logPage.ClipsDescendants=true
 
 local logScroll=Instance.new("ScrollingFrame")
@@ -577,6 +574,12 @@ local function addLog(txt, col)
 end
 
 -- ── BOTTOM BAR ─────────────────────────────────────
+-- ── CREDITS ────────────────────────────────────────
+local credBar=mkF(win,UDim2.new(1,0,0,px(22)),UDim2.new(0,0,1,-px(52)-px(22)),C.bg0)
+mkF(credBar,UDim2.new(1,0,0,1),UDim2.new(0,0,0,0),C.border)
+local credL=mkT(credBar,"made by @voiditic_456  •  help from @dom_zygiie  •  discord.gg/rgHWCthsVU",px(8),C.dim,Enum.Font.Gotham,Enum.TextXAlignment.Center)
+credL.Size=UDim2.new(1,-px(8),1,0); credL.Position=UDim2.new(0,px(4),0,0); credL.TextTruncate=Enum.TextTruncate.AtEnd
+
 local botBar=mkF(win,UDim2.new(1,0,0,px(52)),UDim2.new(0,0,1,-px(52)),C.bg1)
 mkF(botBar,UDim2.new(1,0,0,1),UDim2.new(0,0,0,0),C.border)
 
@@ -1076,11 +1079,23 @@ function openProfilePanel(f)
                 local d=HttpService:JSONDecode(r.Body)
                 friendCount=d.count or 0
             end)
-            -- Friends list (first 50)
+            -- Friends list — paginate through ALL pages using cursor
+            -- The /friends endpoint returns max 200 per request but has a nextPageCursor for more
             pcall(function()
-                local r=httpFn({Url="https://friends.roblox.com/v1/users/"..f.userId.."/friends",Method="GET"})
-                local d=HttpService:JSONDecode(r.Body)
-                for _,u in ipairs(d.data or {}) do table.insert(friendsList,{id=u.id,name=u.name,displayName=u.displayName}) end
+                local cursor=""
+                local maxPages=10  -- safety cap (10*200 = 2000 friends max)
+                local pages=0
+                repeat
+                    pages+=1
+                    local url="https://friends.roblox.com/v1/users/"..f.userId.."/friends?limit=200"
+                    if cursor~="" then url=url.."&cursor="..cursor end
+                    local r=httpFn({Url=url,Method="GET"})
+                    local d=HttpService:JSONDecode(r.Body)
+                    for _,u in ipairs(d.data or {}) do
+                        table.insert(friendsList,{id=u.id,name=u.name,displayName=u.displayName})
+                    end
+                    cursor=d.nextPageCursor or ""
+                until cursor=="" or pages>=maxPages
             end)
         end
 
